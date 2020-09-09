@@ -19,9 +19,3 @@ endif()
 if(CMAKE_COMPILER_IS_GNUCC)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static -static-libgcc")
 endif()
-
-set(ICU_USE_STATIC_LIBS ON)
-
-if(MSVC)
-    set(GTEST_MSVC_SEARCH "MT")
-endif()

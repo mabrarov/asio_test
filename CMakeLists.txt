@@ -33,7 +33,7 @@ if(WIN32)
     list(APPEND libraries "ws2_32" "mswsock")
 endif()
 
-add_executable(asio_271 main.cpp)
+add_executable(asio_271 src/main.cpp)
 target_compile_features(asio_271 PRIVATE cxx_std_11)
 target_compile_definitions(asio_271 PRIVATE ${compile_definitions})
 target_include_directories(asio_271 PRIVATE ${Boost_INCLUDE_DIRS})
