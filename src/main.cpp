@@ -61,7 +61,7 @@ private:
     }
   }
 
-  mutable mutex_type mutex_;
+  mutex_type mutex_;
   condition_variable_type condition_variable_;
   value_type value_;
 };
@@ -175,8 +175,8 @@ int main(int argc, char* argv[])
       ? boost::numeric_cast<std::size_t>(std::stol(argv[2]))
       : static_cast<std::size_t>(1000);
   std::chrono::milliseconds handler_duration(argc > 3
-          ? boost::numeric_cast<std::size_t>(std::stol(argv[3]))
-          : boost::numeric_cast<std::size_t>(200));
+      ? boost::numeric_cast<std::size_t>(std::stol(argv[3]))
+      : static_cast<std::size_t>(200));
   std::size_t thread_num = argc > 4
       ? boost::numeric_cast<std::size_t>(std::stol(argv[4]))
       : boost::numeric_cast<std::size_t>(std::thread::hardware_concurrency());
