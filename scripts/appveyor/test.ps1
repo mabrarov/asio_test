@@ -1,4 +1,4 @@
-$test_cmd = "& ""${env:BUILD_HOME}${env:ARTIFACT_PATH_SUFFIX}asio_test.exe"" ""${env:USE_STRAND_WRAP}"" ""${env:HANDLER_NUM}"" ""${env:HANDLER_DURATION}"" ""${env:THREAD_NUM}"""
+$test_cmd = "& ""${env:BUILD_HOME}\src\strand${env:ARTIFACT_PATH_SUFFIX}strand.exe"" ""${env:USE_STRAND_WRAP}"" ""${env:HANDLER_NUM}"" ""${env:HANDLER_DURATION}"" ""${env:THREAD_NUM}"""
 Write-Host "Running test: ${test_cmd}"
 Invoke-Expression "${test_cmd}"
 if (${LastExitCode} -eq 0) {

@@ -22,7 +22,7 @@ build_cmd="cmake --build \"${BUILD_HOME}\" --config \"${BUILD_TYPE}\""
 echo "CMake project build command: ${build_cmd}"
 eval "${build_cmd}"
 
-test_cmd="\"${BUILD_HOME}/asio_test\" \"${USE_STRAND_WRAP}\" \"${HANDLER_NUM}\" \"${HANDLER_DURATION}\" \"${THREAD_NUM}\""
+test_cmd="\"${BUILD_HOME}/src/strand/strand\" \"${USE_STRAND_WRAP}\" \"${HANDLER_NUM}\" \"${HANDLER_DURATION}\" \"${THREAD_NUM}\""
 echo "Running test: ${test_cmd}"
 if eval "${test_cmd}" ; then
   echo "Test succeeded"

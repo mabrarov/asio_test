@@ -74,5 +74,5 @@ test_script:
   - ps: '.\scripts\appveyor\test.ps1'
 
 artifacts:
-  - path: 'build$(ARTIFACT_PATH_SUFFIX)*.exe'
-    name: 'asio_test'
+  - path: 'build\src\strand$(ARTIFACT_PATH_SUFFIX)*.exe'
+    name: 'strand'
