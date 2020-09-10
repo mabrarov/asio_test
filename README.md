@@ -43,7 +43,7 @@
 1. Unix / Linux commands use Bash
 1. Windows commands use Windows Command Prompt
 
-## Steps
+### Build steps
 
 1. Generate project for build system from CMake project,
    assuming current directory is `build_dir`
