@@ -72,6 +72,20 @@ void post_handler(bool use_strand_wrap,
     std::atomic_size_t& pending_handlers,
     std::atomic_bool& concurrent_handlers_detected);
 
+bool count_down(std::atomic_size_t& counter)
+{
+  std::size_t value = counter.load();
+  while (value)
+  {
+    if (counter.compare_exchange_strong(value, value - 1))
+    {
+      return true;
+    }
+    std::this_thread::yield();
+  }
+  return false;
+}
+
 class handler
 {
 public:
@@ -95,20 +109,14 @@ public:
     {
       concurrent_handlers_detected_ = true;
     }
-    std::size_t pending = pending_handlers_.load();
-    while (pending)
+    if (count_down(pending_handlers_))
     {
-      if (pending_handlers_.compare_exchange_strong(pending, pending - 1))
-      {
-        post_handler(use_strand_wrap_,
-            io_context_,
-            strand_,
-            current_handlers_,
-            pending_handlers_,
-            concurrent_handlers_detected_);
-        break;
-      };
-      std::this_thread::yield();
+      post_handler(use_strand_wrap_,
+          io_context_,
+          strand_,
+          current_handlers_,
+          pending_handlers_,
+          concurrent_handlers_detected_);
     }
     --current_handlers_;
   }
@@ -176,14 +184,14 @@ int main(int argc, char* argv[])
         concurrent_handlers_detected);
   }
 
-  latch thread_start_latch(thread_num);
+  latch run_barrier(thread_num);
   std::vector<std::thread> threads;
   threads.reserve(thread_num);
   for (std::size_t i = 0; i < thread_num; ++i)
   {
-    threads.emplace_back([&io_context, &thread_start_latch]()
+    threads.emplace_back([&io_context, &run_barrier]()
     {
-      thread_start_latch.count_down_and_wait();
+      run_barrier.count_down_and_wait();
       io_context.run();
     });
   }
