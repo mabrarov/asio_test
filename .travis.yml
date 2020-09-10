@@ -16,7 +16,8 @@ env:
     - CURL_RETRY: '10'
     - CURL_RETRY_DELAY: '10'
     - USE_STRAND_WRAP: '1'
-    - HANDLER_NUM: '10000'
+    - HANDLER_NUM: '1000'
+    - HANDLER_DURATION: '100'
     - THREAD_NUM: '100'
 
 matrix:

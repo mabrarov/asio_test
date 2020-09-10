@@ -9,6 +9,7 @@
 #include <vector>
 #include <atomic>
 #include <utility>
+#include <chrono>
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/asio.hpp>
 #include <boost/noncopyable.hpp>
@@ -70,7 +71,8 @@ void post_handler(bool use_strand_wrap,
     boost::asio::io_context::strand& strand,
     std::atomic_size_t& current_handlers,
     std::atomic_size_t& pending_handlers,
-    std::atomic_bool& concurrent_handlers_detected);
+    std::atomic_bool& concurrent_handlers_detected,
+    const std::chrono::milliseconds& handler_duration);
 
 bool count_down(std::atomic_size_t& counter)
 {
@@ -94,13 +96,15 @@ public:
       boost::asio::io_context::strand& strand,
       std::atomic_size_t& current_handlers,
       std::atomic_size_t& pending_handlers,
-      std::atomic_bool& concurrent_handlers_detected)
+      std::atomic_bool& concurrent_handlers_detected,
+      const std::chrono::milliseconds& handler_duration)
     : use_strand_wrap_(use_strand_wrap)
     , io_context_(io_context)
     , strand_(strand)
     , current_handlers_(current_handlers)
     , pending_handlers_(pending_handlers)
     , concurrent_handlers_detected_(concurrent_handlers_detected)
+    , handler_duration_(handler_duration)
   {}
 
   void operator()()
@@ -116,8 +120,10 @@ public:
           strand_,
           current_handlers_,
           pending_handlers_,
-          concurrent_handlers_detected_);
+          concurrent_handlers_detected_,
+          handler_duration_);
     }
+    std::this_thread::sleep_for(handler_duration_);
     --current_handlers_;
   }
 
@@ -128,6 +134,7 @@ private:
   std::atomic_size_t& current_handlers_;
   std::atomic_size_t& pending_handlers_;
   std::atomic_bool& concurrent_handlers_detected_;
+  std::chrono::milliseconds handler_duration_;
 };
 
 void post_handler(bool use_strand_wrap,
@@ -135,14 +142,16 @@ void post_handler(bool use_strand_wrap,
     boost::asio::io_context::strand& strand,
     std::atomic_size_t& current_handlers,
     std::atomic_size_t& pending_handlers,
-    std::atomic_bool& concurrent_handlers_detected)
+    std::atomic_bool& concurrent_handlers_detected,
+    const std::chrono::milliseconds& handler_duration)
 {
   handler h(use_strand_wrap,
       io_context,
       strand,
       current_handlers,
       pending_handlers,
-      concurrent_handlers_detected);
+      concurrent_handlers_detected,
+      handler_duration);
   if (use_strand_wrap)
   {
     boost::asio::post(io_context, strand.wrap(std::move(h)));
@@ -164,9 +173,12 @@ int main(int argc, char* argv[])
   bool use_strand_wrap = argc <= 1 || std::stoi(argv[1]) != 0;
   std::size_t handler_num = argc > 2
       ? boost::numeric_cast<std::size_t>(std::stol(argv[2]))
-      : static_cast<std::size_t>(1000000UL);
-  std::size_t thread_num = argc > 3
-      ? boost::numeric_cast<std::size_t>(std::stol(argv[3]))
+      : static_cast<std::size_t>(1000);
+  std::chrono::milliseconds handler_duration(argc > 3
+          ? boost::numeric_cast<std::size_t>(std::stol(argv[3]))
+          : boost::numeric_cast<std::size_t>(200));
+  std::size_t thread_num = argc > 4
+      ? boost::numeric_cast<std::size_t>(std::stol(argv[4]))
       : boost::numeric_cast<std::size_t>(std::thread::hardware_concurrency());
 
   std::atomic_size_t current_handlers(0);
@@ -181,7 +193,8 @@ int main(int argc, char* argv[])
         strand,
         current_handlers,
         pending_handlers,
-        concurrent_handlers_detected);
+        concurrent_handlers_detected,
+        handler_duration);
   }
 
   latch run_barrier(thread_num);
