@@ -74,18 +74,18 @@ void post_handler(bool use_strand_wrap,
     std::atomic_bool& concurrent_handlers_detected,
     const std::chrono::milliseconds& handler_duration);
 
-bool dec_if_not_zero(std::atomic_size_t& counter)
+std::size_t post_dec_if_not_zero(std::atomic_size_t& counter)
 {
   std::size_t value = counter.load();
   while (value)
   {
     if (counter.compare_exchange_strong(value, value - 1))
     {
-      return true;
+      return value;
     }
     std::this_thread::yield();
   }
-  return false;
+  return 0;
 }
 
 class handler
@@ -113,7 +113,7 @@ public:
     {
       concurrent_handlers_detected_ = true;
     }
-    if (dec_if_not_zero(pending_handlers_))
+    if (post_dec_if_not_zero(pending_handlers_))
     {
       post_handler(use_strand_wrap_,
           io_context_,
