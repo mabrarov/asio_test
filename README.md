@@ -125,4 +125,4 @@
 
 Refer to
 
-1. [src/strand/README.md](src/strand/README.md)
+1. [src/strand_test/README.md](src/strand_test/README.md)

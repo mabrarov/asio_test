@@ -1,11 +1,3 @@
-#include <cstdlib>
-#include <cstddef>
-#include <string>
-#include <thread>
-#include <vector>
-#include <atomic>
-#include <utility>
-#include <chrono>
 #include <latch.hpp>
 
 asio_test::latch::latch(value_type value) : value_(value) {}

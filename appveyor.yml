@@ -19,10 +19,12 @@ environment:
   CURL_MAX_TIME: '1800'
   CURL_RETRY: '10'
   CURL_RETRY_DELAY: '10'
-  USE_STRAND_WRAP: '1'
-  HANDLER_NUM: '1000'
-  HANDLER_DURATION: '100'
-  THREAD_NUM: '100'
+  STRAND_TEST_USE_STRAND_WRAP: '1'
+  STRAND_TEST_THREAD_NUM: '100'
+  STRAND_TEST_HANDLER_DURATION: '100'
+  STRAND_TEST_INIT_HANDLER_NUM: '400'
+  STRAND_TEST_CONCURRENT_HANDLER_NUM: '400'
+  STRAND_TEST_STRAND_HANDLER_NUM: '200'
 
   matrix:
     - APPVEYOR_BUILD_WORKER_IMAGE: 'Visual Studio 2019'
@@ -74,5 +76,5 @@ test_script:
   - ps: '.\scripts\appveyor\test.ps1'
 
 artifacts:
-  - path: 'build\src\strand$(ARTIFACT_PATH_SUFFIX)*.exe'
-    name: 'strand'
+  - path: 'build\src\strand_test$(ARTIFACT_PATH_SUFFIX)*.exe'
+    name: 'strand_test'
