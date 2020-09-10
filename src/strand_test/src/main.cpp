@@ -161,17 +161,22 @@ int main(int argc, char* argv[])
       return EXIT_SUCCESS;
     }
 
+    std::size_t thread_num =
+        po_values[thread_num_option_name].as<std::size_t>();
+    if (!thread_num)
+    {
+      throw boost::program_options::error(
+          "number of threads should be positive integer");
+    }
     bool use_strand_wrap = po_values[use_strand_wrap_option_name].as<bool>();
+    std::chrono::milliseconds handler_duration(
+        po_values[handler_duration_option_name].as<std::size_t>());
     std::size_t initial_handler_num =
         po_values[init_handler_num_option_name].as<std::size_t>();
     std::size_t concurrently_posted_handler_num =
         po_values[concurrent_handler_num_option_name].as<std::size_t>();
     std::atomic_size_t strand_posted_handlers(
         po_values[strand_handler_num_option_name].as<std::size_t>());
-    std::chrono::milliseconds handler_duration(
-        po_values[handler_duration_option_name].as<std::size_t>());
-    std::size_t thread_num =
-        po_values[thread_num_option_name].as<std::size_t>();
 
     std::atomic_size_t current_handlers(0);
     std::atomic_bool parallel_handlers(false);
