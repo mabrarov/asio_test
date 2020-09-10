@@ -1,0 +1,77 @@
+image: 'Visual Studio 2015'
+
+platform:
+  - 'x64'
+  - 'Win32'
+
+configuration:
+  - 'Release'
+  - 'Debug'
+
+environment:
+  DEPENDENCIES_FOLDER: 'C:\projects\dependencies'
+  DOWNLOADS_FOLDER: 'C:\projects\downloads'
+  BUILD_HOME: '%APPVEYOR_BUILD_FOLDER%\build'
+  VSWHERE_URL: 'https://github.com/Microsoft/vswhere/releases/download'
+  VSWHERE_VERSION: '2.8.4'
+  VSWHERE_DIST_NAME: 'vswhere.exe'
+  CURL_CONNECT_TIMEOUT: '300'
+  CURL_MAX_TIME: '1800'
+  CURL_RETRY: '10'
+  CURL_RETRY_DELAY: '10'
+  USE_STRAND_WRAP: '1'
+  HANDLER_NUM: '10000'
+  THREAD_NUM: '100'
+
+  matrix:
+    - APPVEYOR_BUILD_WORKER_IMAGE: 'Visual Studio 2019'
+      TOOLCHAIN: 'msvc'
+      MSVC_VERSION: '14.2'
+      RUNTIME_LINKAGE: 'static'
+      CMAKE_VERSION: '3.18.2'
+      BOOST_VERSION: '1.74.0'
+      BOOST_LINKAGE: 'static'
+    - APPVEYOR_BUILD_WORKER_IMAGE: 'Visual Studio 2017'
+      TOOLCHAIN: 'msvc'
+      MSVC_VERSION: '14.1'
+      RUNTIME_LINKAGE: 'static'
+      CMAKE_VERSION: '3.18.2'
+      BOOST_VERSION: '1.74.0'
+      BOOST_LINKAGE: 'static'
+    - TOOLCHAIN: 'msvc'
+      MSVC_VERSION: '14.0'
+      RUNTIME_LINKAGE: 'static'
+      CMAKE_VERSION: '3.18.2'
+      BOOST_VERSION: '1.74.0'
+      BOOST_LINKAGE: 'static'
+    - TOOLCHAIN: 'mingw'
+      MINGW_VERSION: '7.3.0'
+      MINGW_RT_VERSION: '5'
+      MINGW_REVISION: '0'
+      RUNTIME_LINKAGE: 'static'
+      CMAKE_VERSION: '3.18.2'
+      BOOST_VERSION: '1.74.0'
+      BOOST_LINKAGE: 'static'
+
+matrix:
+  exclude:
+    - platform: 'Win32'
+      TOOLCHAIN: 'mingw'
+
+cache:
+  - 'C:\projects\downloads -> .appveyor.yml'
+
+install:
+  - ps: '.\scripts\appveyor\install.ps1'
+  - cmd: 'if not "%MSVC_VARS_BATCH_FILE%"=="" call "%MSVC_VARS_BATCH_FILE%" %MSVC_VARS_PLATFORM%'
+  - ps: '.\scripts\appveyor\environment.ps1'
+
+build_script:
+  - ps: '.\scripts\appveyor\build.ps1'
+
+test_script:
+  - ps: '.\scripts\appveyor\test.ps1'
+
+artifacts:
+  - path: 'build$(ARTIFACT_PATH_SUFFIX)*.exe'
+    name: 'asio_test'
