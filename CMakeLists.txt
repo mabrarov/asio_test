@@ -39,7 +39,7 @@ if(WIN32)
 endif()
 
 add_executable(asio_test src/main.cpp)
-target_compile_features(asio_test PRIVATE cxx_std_11)
+target_compile_features(asio_test PRIVATE cxx_std_11 cxx_lambdas)
 target_compile_definitions(asio_test PRIVATE ${compile_definitions})
 target_include_directories(asio_test PRIVATE ${Boost_INCLUDE_DIRS})
 target_link_libraries(asio_test PRIVATE ${libraries})
