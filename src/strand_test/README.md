@@ -15,6 +15,7 @@ Allowed options:
 | --init | Non-negative integer | 500 | Number of handlers posted initially, before starting worker threads |
 | --concurrent | Non-negative integer | 500 | Number of handlers posted concurrently from worker threads |
 | --strand | Non-negative | 500 | Number of handlers posted from code executed inside strand |
+| --timer | Non-negative | 500 | Number of handlers executed using deadline_timer asynchronous wait |
 
 Returns zero exit code if didn't detect any handlers executed through strand
 running in parallel. Returns non-zero otherwise.
