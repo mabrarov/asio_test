@@ -8,13 +8,9 @@ Allowed options:
 
 | Name | Value format | Default value | Meaning |
 |------|--------------|---------------|---------|
-| --help | | | Show help and exit |
-| --use-strand-wrap | 0 or 1 | 1 | Use [`boost::asio::io_context::strand::wrap`](https://www.boost.org/doc/libs/1_74_0/doc/html/boost_asio/reference/io_context__strand/wrap.html) method instead of [`boost::asio::bind_executor`](https://www.boost.org/doc/libs/1_74_0/doc/html/boost_asio/reference/io_context__strand/wrap.html) function when wrapping handler with strand |
 | --threads | Positive integer | Hardware concurrency detected by C++ standard library | Number of worker threads to run |
-| --duration | Non-negative integer | 200 | Duration of handler, milliseconds |
-| --init | Non-negative integer | 500 | Number of handlers posted initially, before starting worker threads |
-| --concurrent | Non-negative integer | 500 | Number of handlers posted concurrently from worker threads |
-| --strand | Non-negative | 500 | Number of handlers posted from code executed inside strand |
+| --streams | Non-negative integer | 512 | Number of asynchronous streams sharing the same instance of `boost::asio:io_context::strand` |
+| --size | Non-negative integer | 16 | Max size of single asynchronous operation, bytes |
+| --operations | Non-negative integer | 1000 | Number of asynchronous operations in a single composed operation |
 
-Returns zero exit code if didn't detect any handlers executed through strand
-running in parallel. Returns non-zero otherwise.
+Returns zero exit code if didn't detect any handlers executed through strand running in parallel. Returns non-zero otherwise.

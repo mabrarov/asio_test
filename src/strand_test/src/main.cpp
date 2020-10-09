@@ -5,49 +5,220 @@
 #include <cstdlib>
 #include <cstddef>
 #include <utility>
-#include <thread>
-#include <vector>
-#include <atomic>
-#include <chrono>
 #include <exception>
+#include <memory>
 #include <iostream>
+#include <algorithm>
+#include <vector>
+#include <set>
+#include <chrono>
+#include <thread>
+#include <boost/system/error_code.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/program_options.hpp>
 #include <boost/asio.hpp>
 #include <latch.hpp>
 
-namespace strand_test {
+namespace {
 
-void post_handler(bool use_strand_wrap,
-    boost::asio::io_context& io_context,
-    boost::asio::io_context::strand& strand,
-    std::atomic_size_t& current_handlers,
-    std::atomic_size_t& pending_handlers,
-    std::atomic_bool& parallel_handlers,
-    const std::chrono::milliseconds& handler_duration);
+class access_registrar
+{
+public:
+  access_registrar() : concurrent_(false) {}
 
-const char* help_option_name                   = "help";
-const char* use_strand_wrap_option_name        = "use-strand-wrap";
-const char* thread_num_option_name             = "threads";
-const char* handler_duration_option_name       = "duration";
-const char* init_handler_num_option_name       = "init";
-const char* concurrent_handler_num_option_name = "concurrent";
-const char* strand_handler_num_option_name     = "strand";
+  void enter()
+  {
+    auto thread_id = std::this_thread::get_id();
+    std::lock_guard<mutex_type> mutex_guard(mutex_);
+    concurrent_ = threads_.size() != threads_.count(thread_id);
+    threads_.insert(thread_id);
+  }
+
+  void leave()
+  {
+    auto thread_id = std::this_thread::get_id();
+    std::lock_guard<mutex_type> mutex_guard(mutex_);
+    threads_.erase(threads_.find(thread_id));
+  }
+
+  bool concurrent() const
+  {
+    return concurrent_;
+  }
+
+private:
+  typedef std::mutex mutex_type;
+
+  bool concurrent_;
+  mutex_type mutex_;
+  std::multiset<std::thread::id> threads_;
+};
+
+class async_stream
+{
+public:
+  typedef boost::asio::io_context::executor_type executor_type;
+
+  async_stream(boost::asio::io_context& io_context, access_registrar& registrar, size_t size)
+      : io_context_(io_context)
+      , registrar_(registrar)
+      , size_(size)
+  {}
+
+  executor_type get_executor()
+  {
+    return io_context_.get_executor();
+  }
+
+  template <typename ConstBufferSequence, typename WriteHandler>
+  void async_write_some(const ConstBufferSequence& buffers, WriteHandler&& handler)
+  {
+    registrar_.enter();
+    // Assuming asynchronous write completed successfully
+    auto error = boost::system::error_code();
+    auto transferred = (std::min)(size_, boost::asio::buffer_size(buffers));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    io_context_.post(boost::asio::detail::bind_handler(handler, error, transferred));
+    registrar_.leave();
+  }
+
+
+  template <typename MutableBufferSequence, typename ReadHandler>
+  void async_read_some(const MutableBufferSequence& buffers, ReadHandler&& handler)
+  {
+    registrar_.enter();
+    // Assuming asynchronous read completed successfully
+    auto error = boost::system::error_code();
+    auto transferred = (std::min)(size_, boost::asio::buffer_size(buffers));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::fill_n(boost::asio::buffers_begin(buffers), transferred, 0);
+    io_context_.post(boost::asio::detail::bind_handler(handler, error, transferred));
+    registrar_.leave();
+  }
+
+private:
+  boost::asio::io_context& io_context_;
+  access_registrar& registrar_;
+  std::size_t size_;
+};
+
+class client
+{
+public:
+  client(boost::asio::io_context::strand& strand,
+      access_registrar& registrar,
+      std::size_t operations_num,
+      std::size_t operation_size,
+      std::size_t composed_operations_num)
+      : strand_(strand)
+      , stream_(strand.context(), registrar, operation_size)
+      , receive_buffers_(operation_size * operations_num, 0)
+      , send_buffers_(operation_size * operations_num, 0)
+      , read_op_num_(composed_operations_num)
+      , write_op_num_(composed_operations_num)
+  {}
+
+  void start()
+  {
+    strand_.post([this]()
+    {
+      this->start_read();
+      this->start_write();
+    });
+  }
+
+private:
+  void start_read()
+  {
+    if (read_op_num_)
+    {
+      --read_op_num_;
+      boost::asio::async_read(stream_, boost::asio::buffer(receive_buffers_), strand_.wrap(
+          [this](const boost::system::error_code&, std::size_t)
+          {
+            this->start_read();
+          }));
+    }
+  }
+
+  void start_write()
+  {
+    if (write_op_num_)
+    {
+      --write_op_num_;
+      boost::asio::async_write(stream_, boost::asio::buffer(send_buffers_), strand_.wrap(
+          [this](const boost::system::error_code&, std::size_t)
+          {
+            this->start_write();
+          }));
+    }
+  }
+
+  boost::asio::io_context::strand& strand_;
+  async_stream stream_;
+  std::vector<char> receive_buffers_;
+  std::vector<char> send_buffers_;
+  std::size_t read_op_num_;
+  std::size_t write_op_num_;
+};
+
+const char* thread_num_option_name     = "threads";
+const char* stream_num_option_name     = "streams";
+const char* operation_size_option_name = "size";
+const char* operations_num_option_name = "operations";
+const char* composed_operations_num_option_name = "repeats";
 
 boost::program_options::options_description build_program_options_description(
-    std::size_t hardware_concurrency);
+    std::size_t hardware_concurrency)
+{
+  boost::program_options::options_description description("Allowed options");
+  description.add_options()
+      (
+          thread_num_option_name,
+          boost::program_options::value<std::size_t>()->default_value(hardware_concurrency),
+          "number of threads"
+      )
+      (
+          stream_num_option_name,
+          boost::program_options::value<std::size_t>()->default_value(512),
+          "number of streams"
+      )
+      (
+          operation_size_option_name,
+          boost::program_options::value<std::size_t>()->default_value(16),
+          "max size of single asynchronous operation"
+      )
+      (
+          operations_num_option_name,
+          boost::program_options::value<std::size_t>()->default_value(1000),
+          "number of asynchronous operations"
+      )
+      (
+          composed_operations_num_option_name,
+          boost::program_options::value<std::size_t>()->default_value(10),
+          "number of asynchronous composed operations"
+      );
+  return std::move(description);
+}
 
 #if defined(WIN32)
 boost::program_options::variables_map parse_program_options(
     const boost::program_options::options_description& options_description,
-    int argc, _TCHAR* argv[]);
+    int argc, _TCHAR* argv[])
 #else
 boost::program_options::variables_map parse_program_options(
     const boost::program_options::options_description& options_description,
-    int argc, char* argv[]);
+    int argc, char* argv[])
 #endif
+{
+  boost::program_options::variables_map values;
+  boost::program_options::store(boost::program_options::parse_command_line(
+      argc, argv, options_description), values);
+  boost::program_options::notify(values);
+  return std::move(values);
+}
 
-} // strand_test namespace
+} // anonymous namespace
 
 #if defined(WIN32)
 int _tmain(int argc, _TCHAR* argv[])
@@ -57,65 +228,47 @@ int main(int argc, char* argv[])
 {
   try
   {
-    auto po_description = strand_test::build_program_options_description(
+    auto po_description = build_program_options_description(
         boost::numeric_cast<std::size_t>(std::thread::hardware_concurrency()));
-    auto po_values = strand_test::parse_program_options(po_description, argc, argv);
-    if (po_values.count(strand_test::help_option_name))
-    {
-      std::cout << po_description;
-      return EXIT_SUCCESS;
-    }
-
-    std::size_t thread_num =
-        po_values[strand_test::thread_num_option_name].as<std::size_t>();
+    auto po_values = parse_program_options(po_description, argc, argv);
+    std::size_t thread_num = po_values[thread_num_option_name].as<std::size_t>();
     if (!thread_num)
     {
       throw boost::program_options::error(
           "number of threads should be positive integer");
     }
-    bool use_strand_wrap =
-        po_values[strand_test::use_strand_wrap_option_name].as<bool>();
-    std::chrono::milliseconds handler_duration(
-        po_values[strand_test::handler_duration_option_name].as<std::size_t>());
-    std::size_t initial_handler_num =
-        po_values[strand_test::init_handler_num_option_name].as<std::size_t>();
-    std::size_t concurrently_posted_handler_num =
-        po_values[strand_test::concurrent_handler_num_option_name].as<std::size_t>();
-    std::atomic_size_t strand_posted_handlers(
-        po_values[strand_test::strand_handler_num_option_name].as<std::size_t>());
-
-    std::atomic_size_t current_handlers(0);
-    std::atomic_bool parallel_handlers(false);
-    boost::asio::io_context io_context(boost::numeric_cast<int>(thread_num));
-    boost::asio::io_context::strand strand(io_context);
-    for (std::size_t i = 0; i < initial_handler_num; ++i)
+    std::size_t stream_num = po_values[stream_num_option_name].as<std::size_t>();
+    std::size_t operation_size = po_values[operation_size_option_name].as<std::size_t>();
+    if (!operation_size)
     {
-      strand_test::post_handler(use_strand_wrap,
-          io_context,
-          strand,
-          current_handlers,
-          strand_posted_handlers,
-          parallel_handlers,
-          handler_duration);
+      throw boost::program_options::error(
+          "max size of single asynchronous operation should be positive integer");
     }
-    for (std::size_t i = 0; i < concurrently_posted_handler_num; ++i)
+    std::size_t operations_num = po_values[operations_num_option_name].as<std::size_t>();
+    if (!operations_num)
     {
-      boost::asio::post(io_context, [use_strand_wrap,
-          &io_context,
-          &strand,
-          &current_handlers,
-          &strand_posted_handlers,
-          &parallel_handlers,
-          handler_duration]()
-          {
-            strand_test::post_handler(use_strand_wrap,
-                io_context,
-                strand,
-                current_handlers,
-                strand_posted_handlers,
-                parallel_handlers,
-                handler_duration);
-          });
+      throw boost::program_options::error(
+          "number of asynchronous operations should be positive integer");
+    }
+    std::size_t composed_operations_num = po_values[composed_operations_num_option_name].as<std::size_t>();
+    if (!composed_operations_num)
+    {
+      throw boost::program_options::error(
+          "number of asynchronous composed operations should be positive integer");
+    }
+
+    access_registrar registrar;
+    boost::asio::io_context io_context;
+    boost::asio::io_context::strand strand(io_context);
+
+    std::vector<std::unique_ptr<client>> clients;
+    clients.reserve(stream_num);
+    for (std::size_t i = 0; i != stream_num; ++i)
+    {
+      std::unique_ptr<client> c(new client(strand, registrar,
+          operations_num, operation_size, composed_operations_num));
+      c->start();
+      clients.push_back(std::move(c));
     }
 
     asio_test::latch run_barrier(thread_num);
@@ -134,7 +287,7 @@ int main(int argc, char* argv[])
       threads[i].join();
     }
 
-    return parallel_handlers ? EXIT_FAILURE : EXIT_SUCCESS;
+    return registrar.concurrent() ? EXIT_FAILURE : EXIT_SUCCESS;
   }
   catch (const boost::program_options::error& e)
   {
@@ -149,124 +302,4 @@ int main(int argc, char* argv[])
     std::cerr << "Unknown error" << std::endl;
   }
   return EXIT_FAILURE;
-} // main
-
-namespace {
-
-std::size_t post_dec_if_not_zero(std::atomic_size_t& counter)
-{
-  std::size_t value = counter.load();
-  while (value)
-  {
-    if (counter.compare_exchange_strong(value, value - 1))
-    {
-      return value;
-    }
-    std::this_thread::yield();
-  }
-  return 0;
-}
-
-} // anonymous namespace
-
-void strand_test::post_handler(bool use_strand_wrap,
-    boost::asio::io_context& io_context,
-    boost::asio::io_context::strand& strand,
-    std::atomic_size_t& current_handlers,
-    std::atomic_size_t& pending_handlers,
-    std::atomic_bool& parallel_handlers,
-    const std::chrono::milliseconds& handler_duration)
-{
-  auto handler = [use_strand_wrap,
-      &io_context,
-      &strand,
-      &current_handlers,
-      &pending_handlers,
-      &parallel_handlers,
-      handler_duration]()
-  {
-    if (current_handlers++)
-    {
-      parallel_handlers = true;
-    }
-    if (post_dec_if_not_zero(pending_handlers))
-    {
-      post_handler(use_strand_wrap,
-          io_context,
-          strand,
-          current_handlers,
-          pending_handlers,
-          parallel_handlers,
-          handler_duration);
-    }
-    std::this_thread::sleep_for(handler_duration);
-    --current_handlers;
-  };
-  if (use_strand_wrap)
-  {
-    boost::asio::post(io_context, strand.wrap(std::move(handler)));
-  }
-  else
-  {
-    boost::asio::post(io_context, boost::asio::bind_executor(strand, std::move(handler)));
-  }
-} // post_handler
-
-boost::program_options::options_description strand_test::build_program_options_description(
-    std::size_t hardware_concurrency)
-{
-  boost::program_options::options_description description("Allowed options");
-  description.add_options()
-      (
-          help_option_name,
-          "produce help message"
-      )
-      (
-          use_strand_wrap_option_name,
-          boost::program_options::value<bool>()->default_value(true),
-          "use boost::asio::io_context::strand::wrap instead of boost::asio::bind_executor"
-      )
-      (
-          thread_num_option_name,
-          boost::program_options::value<std::size_t>()->default_value(hardware_concurrency),
-          "number of threads"
-      )
-      (
-          handler_duration_option_name,
-          boost::program_options::value<std::size_t>()->default_value(200),
-          "duration of handler, milliseconds"
-      )
-      (
-          init_handler_num_option_name,
-          boost::program_options::value<std::size_t>()->default_value(500),
-          "number of initially posted handlers"
-      )
-      (
-          concurrent_handler_num_option_name,
-          boost::program_options::value<std::size_t>()->default_value(500),
-          "number of concurrently posted handlers"
-      )
-      (
-          strand_handler_num_option_name,
-          boost::program_options::value<std::size_t>()->default_value(500),
-          "number of handlers posted from strand"
-      );
-  return std::move(description);
-} // build_program_options_description
-
-#if defined(WIN32)
-boost::program_options::variables_map strand_test::parse_program_options(
-    const boost::program_options::options_description& options_description,
-    int argc, _TCHAR* argv[])
-#else
-boost::program_options::variables_map strand_test::parse_program_options(
-    const boost::program_options::options_description& options_description,
-    int argc, char* argv[])
-#endif
-{
-  boost::program_options::variables_map values;
-  boost::program_options::store(boost::program_options::parse_command_line(
-      argc, argv, options_description), values);
-  boost::program_options::notify(values);
-  return std::move(values);
 }

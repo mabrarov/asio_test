@@ -22,7 +22,7 @@ build_cmd="cmake --build \"${BUILD_HOME}\" --config \"${BUILD_TYPE}\""
 echo "CMake project build command: ${build_cmd}"
 eval "${build_cmd}"
 
-test_cmd="\"${BUILD_HOME}/src/strand_test/strand_test\" --use-strand-wrap \"${STRAND_TEST_USE_STRAND_WRAP}\" --threads \"${STRAND_TEST_THREAD_NUM}\" --duration \"${STRAND_TEST_HANDLER_DURATION}\" --init \"${STRAND_TEST_INIT_HANDLER_NUM}\" --concurrent \"${STRAND_TEST_CONCURRENT_HANDLER_NUM}\" --strand \"${STRAND_TEST_STRAND_HANDLER_NUM}\""
+test_cmd="\"${BUILD_HOME}/src/strand_test/strand_test\" --threads \"${STRAND_TEST_THREAD_NUM}\" --streams \"${STRAND_TEST_STREAM_NUM}\" --size \"${STRAND_TEST_OPERATION_SIZE}\" --operations \"${STRAND_TEST_OPERATION_NUM}\" --repeats \"${STRAND_TEST_REPEAT_NUM}\""
 echo "Running test: ${test_cmd}"
 if eval "${test_cmd}" ; then
   echo "Test succeeded"
