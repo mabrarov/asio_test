@@ -13,6 +13,7 @@
 #include <set>
 #include <chrono>
 #include <thread>
+#include <functional>
 #include <boost/system/error_code.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/program_options.hpp>
@@ -24,14 +25,27 @@ namespace {
 class access_registrar
 {
 public:
-  access_registrar() : concurrent_(false) {}
+  typedef std::function<void()> handler_type;
+
+  explicit access_registrar(handler_type handler)
+      : handler_(std::move(handler))
+      , concurrent_(false)
+  {}
 
   void enter()
   {
     auto thread_id = std::this_thread::get_id();
-    std::lock_guard<mutex_type> mutex_guard(mutex_);
-    concurrent_ = threads_.size() != threads_.count(thread_id);
-    threads_.insert(thread_id);
+    bool concurrent;
+    {
+      std::lock_guard<mutex_type> mutex_guard(mutex_);
+      concurrent_ |= threads_.size() != threads_.count(thread_id);
+      threads_.insert(thread_id);
+      concurrent = concurrent_;
+    }
+    if (concurrent)
+    {
+      handler_();
+    }
   }
 
   void leave()
@@ -52,6 +66,7 @@ private:
   bool concurrent_;
   mutex_type mutex_;
   std::multiset<std::thread::id> threads_;
+  handler_type handler_;
 };
 
 class async_stream
@@ -257,9 +272,12 @@ int main(int argc, char* argv[])
           "number of asynchronous composed operations should be positive integer");
     }
 
-    access_registrar registrar;
     boost::asio::io_context io_context;
     boost::asio::io_context::strand strand(io_context);
+    access_registrar registrar([&io_context]()
+    {
+      io_context.stop();
+    });
 
     std::vector<std::unique_ptr<client>> clients;
     clients.reserve(stream_num);
