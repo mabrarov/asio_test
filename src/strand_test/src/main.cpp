@@ -177,6 +177,7 @@ private:
   std::size_t write_op_num_;
 };
 
+const char* help_option_name           = "help";
 const char* thread_num_option_name     = "threads";
 const char* stream_num_option_name     = "streams";
 const char* operation_size_option_name = "size";
@@ -188,6 +189,10 @@ boost::program_options::options_description build_program_options_description(
 {
   boost::program_options::options_description description("Allowed options");
   description.add_options()
+      (
+          help_option_name,
+          "produce help message"
+      )
       (
           thread_num_option_name,
           boost::program_options::value<std::size_t>()->default_value(hardware_concurrency),
@@ -246,6 +251,11 @@ int main(int argc, char* argv[])
     auto po_description = build_program_options_description(
         boost::numeric_cast<std::size_t>(std::thread::hardware_concurrency()));
     auto po_values = parse_program_options(po_description, argc, argv);
+    if (po_values.count(help_option_name))
+    {
+      std::cout << po_description;
+      return EXIT_SUCCESS;
+    }
     std::size_t thread_num = po_values[thread_num_option_name].as<std::size_t>();
     if (!thread_num)
     {
