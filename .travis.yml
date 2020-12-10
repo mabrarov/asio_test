@@ -30,7 +30,7 @@ matrix:
       env:
         - C_COMPILER: 'gcc-10'
         - CXX_COMPILER: 'g++-10'
-        - CMAKE_VERSION: '3.18.2'
+        - CMAKE_VERSION: '3.19.1'
         - BOOST_VERSION: '1.74.0'
         - BUILD_TYPE: 'RELEASE'
       compiler: 'gcc'
@@ -52,7 +52,7 @@ matrix:
       env:
         - C_COMPILER: 'gcc-10'
         - CXX_COMPILER: 'g++-10'
-        - CMAKE_VERSION: '3.18.2'
+        - CMAKE_VERSION: '3.19.1'
         - BOOST_VERSION: '1.74.0'
         - BUILD_TYPE: 'DEBUG'
       compiler: 'gcc'
@@ -63,7 +63,7 @@ matrix:
       env:
         - C_COMPILER: 'clang-10'
         - CXX_COMPILER: 'clang++-10'
-        - CMAKE_VERSION: '3.18.2'
+        - CMAKE_VERSION: '3.19.1'
         - BOOST_VERSION: '1.74.0'
         - BUILD_TYPE: 'RELEASE'
       compiler: 'clang'
@@ -84,7 +84,7 @@ matrix:
       env:
         - C_COMPILER: 'clang-10'
         - CXX_COMPILER: 'clang++-10'
-        - CMAKE_VERSION: '3.18.2'
+        - CMAKE_VERSION: '3.19.1'
         - BOOST_VERSION: '1.74.0'
         - BUILD_TYPE: 'DEBUG'
       compiler: 'clang'
