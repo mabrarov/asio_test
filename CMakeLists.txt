@@ -3,3 +3,4 @@ project(asio_test)
 
 add_subdirectory(src/latch)
 add_subdirectory(src/strand_test)
+add_subdirectory(src/acceptor_cancel_test)
